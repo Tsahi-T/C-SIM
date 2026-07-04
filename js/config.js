@@ -50,23 +50,23 @@ var CFG = {
   // --- גרפיקה ---
   FOG_NEAR_FACTOR: 0.45,
   VIEW_DISTANCE: 30000,         // מ' מרחק ראייה בסיסי
-  SKY_TOP: 0x1c4a8c,
-  SKY_HORIZON: 0xa8cfe8,
+  SKY_TOP: 0x2a6cb8,
+  SKY_HORIZON: 0xc3d9ea,
 
   COLORS: {
-    OCEAN: 0x1a4a72,
-    SAND: 0xc9b487,
-    GRASS: 0x6f8f4e,
-    FOREST: 0x3f6b38,
-    DESERT: 0xc8a76a,
-    TUNDRA: 0x9aa78f,
-    SNOW: 0xe8eef2,
-    URBAN: 0x8f8f8a,
-    FIELD_A: 0x8faa50,
-    FIELD_B: 0xb5a465,
-    FIELD_C: 0x7c9a5e,
-    ROAD: 0x3c3c40,
-    RUNWAY: 0x2e2e33
+    OCEAN: 0x1d5c8f,
+    SAND: 0xd8c797,
+    GRASS: 0x76975c,
+    FOREST: 0x466f41,
+    DESERT: 0xcfa972,
+    TUNDRA: 0xa8b29b,
+    SNOW: 0xeef3f6,
+    URBAN: 0x9b9891,
+    FIELD_A: 0x9db35e,
+    FIELD_B: 0xc2ae6d,
+    FIELD_C: 0x86a568,
+    ROAD: 0x43434a,
+    RUNWAY: 0x333338
   }
 };
 

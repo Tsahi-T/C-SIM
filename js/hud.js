@@ -108,6 +108,9 @@ HUD.draw = function (ac, timeScale, camMode) {
 
   /* ---- סרט כיוון (למעלה) ---- */
   var tapeY = 34;
+  c.fillStyle = "rgba(0, 14, 6, 0.28)";
+  c.fillRect(cx - 160 * f, 26, 320 * f, 26);
+  c.fillStyle = HUD.color;
   c.save();
   c.beginPath();
   c.rect(cx - 160 * f, 8, 320 * f, 44);
@@ -165,7 +168,8 @@ HUD.draw = function (ac, timeScale, camMode) {
   if (timeScale > 1) status.push("TIME ×" + timeScale);
   c.fillText(status.join("   "), cx, H - 26);
 
-  c.fillText(U.fmtCoord(ac.lat, ac.lon) + "   " + Math.round(ac.distanceFlownKm) + ' ק"מ', cx, H - 8);
+  // שורת מיקום — לטינית בלבד כדי למנוע היפוך RTL בקנבס
+  c.fillText(U.fmtCoord(ac.lat, ac.lon) + "   DST " + Math.round(ac.distanceFlownKm) + " KM", cx, H - 8);
 
   /* ---- אזהרות ---- */
   c.font = "bold " + (22 * f | 0) + "px Consolas, monospace";
@@ -190,6 +194,10 @@ HUD.draw = function (ac, timeScale, camMode) {
 /* סרגל אנכי גולל (מהירות/גובה) */
 HUD.tape = function (c, x, cy, value, step, pxPerUnit, rightSide, f) {
   var halfH = 90 * f;
+  // רקע שקוף עדין לקריאות
+  c.fillStyle = "rgba(0, 14, 6, 0.28)";
+  c.fillRect(x - (rightSide ? 12 : 52) * f, cy - halfH, 64 * f, halfH * 2);
+  c.fillStyle = HUD.color;
   c.save();
   c.beginPath();
   c.rect(x - 60 * f, cy - halfH, 120 * f, halfH * 2);

@@ -167,20 +167,97 @@ WORLD.init = function (scene) {
   scene.background = new THREE.Color(CFG.SKY_HORIZON);
   scene.fog = new THREE.Fog(CFG.SKY_HORIZON, 3000, CFG.VIEW_DISTANCE);
 
-  // דיסקת אוקיינוס קרובה (מתחת לצ'אנקים)
+  WORLD.buildSky();
+
+  // דיסקת אוקיינוס קרובה (מתחת לצ'אנקים) — עם ברק שמש עדין
   var ocean = new THREE.Mesh(
     new THREE.CircleGeometry(CFG.VIEW_DISTANCE * 1.4, 48),
-    new THREE.MeshLambertMaterial({ color: CFG.COLORS.OCEAN })
+    new THREE.MeshPhongMaterial({ color: CFG.COLORS.OCEAN, specular: 0x445566, shininess: 80 })
   );
   ocean.rotation.x = -Math.PI / 2;
   ocean.position.y = -2;
+  ocean.receiveShadow = true;
   scene.add(ocean);
   WORLD.ocean = ocean;
 
+  WORLD.buildGroundTexture();
   WORLD.buildWorldTexture();
   WORLD.buildFarDisc();
   WORLD.buildClouds();
   WORLD.buildAirports();
+};
+
+/* ---------- כיפת שמיים עם גרדיאנט + שמש ---------- */
+WORLD.buildSky = function () {
+  var R = 800000;
+  var geo = new THREE.SphereGeometry(R, 24, 16);
+  var pos = geo.attributes.position;
+  var colors = new Float32Array(pos.count * 3);
+  var top = new THREE.Color(CFG.SKY_TOP);
+  var hor = new THREE.Color(CFG.SKY_HORIZON);
+  var low = new THREE.Color(0x8fa6ba);       // אובך מתחת לאופק
+  var c = new THREE.Color();
+  for (var i = 0; i < pos.count; i++) {
+    var t = pos.getY(i) / R;
+    if (t >= 0) c.copy(hor).lerp(top, Math.pow(t, 0.55));
+    else c.copy(hor).lerp(low, U.clamp(-t * 4, 0, 1));
+    colors[i * 3] = c.r; colors[i * 3 + 1] = c.g; colors[i * 3 + 2] = c.b;
+  }
+  geo.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+  var dome = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({
+    vertexColors: true, side: THREE.BackSide, depthWrite: false, fog: false
+  }));
+  dome.renderOrder = -10;
+  dome.frustumCulled = false;
+  WORLD.scene.add(dome);
+
+  // שמש — ספרייט זוהר בכיוון מקור האור
+  var cv = document.createElement("canvas");
+  cv.width = cv.height = 128;
+  var g2 = cv.getContext("2d");
+  var grd = g2.createRadialGradient(64, 64, 4, 64, 64, 62);
+  grd.addColorStop(0, "rgba(255,252,240,1)");
+  grd.addColorStop(0.18, "rgba(255,246,214,0.9)");
+  grd.addColorStop(0.5, "rgba(255,238,190,0.25)");
+  grd.addColorStop(1, "rgba(255,235,180,0)");
+  g2.fillStyle = grd; g2.fillRect(0, 0, 128, 128);
+  var sunSprite = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: new THREE.CanvasTexture(cv), transparent: true, fog: false,
+    blending: THREE.AdditiveBlending, depthWrite: false, depthTest: false
+  }));
+  var dir = new THREE.Vector3(600, 1000, -400).normalize();
+  sunSprite.position.copy(dir.multiplyScalar(R * 0.9));
+  sunSprite.scale.set(R * 0.14, R * 0.14, 1);
+  sunSprite.renderOrder = -9;
+  WORLD.scene.add(sunSprite);
+};
+
+/* ---------- טקסטורת פירוט לקרקע — רעש עדין שנותן תחושת תנועה ---------- */
+WORLD.buildGroundTexture = function () {
+  var cv = document.createElement("canvas");
+  cv.width = cv.height = 128;
+  var c = cv.getContext("2d");
+  c.fillStyle = "#fff";
+  c.fillRect(0, 0, 128, 128);
+  var img = c.getImageData(0, 0, 128, 128);
+  var d = img.data;
+  for (var i = 0; i < d.length; i += 4) {
+    var n = 244 + Math.floor(Math.random() * 12);   // רעש בהירות עדין
+    d[i] = d[i + 1] = d[i + 2] = n;
+  }
+  c.putImageData(img, 0, 0);
+  // כתמים אקראיים כהים מעט (שיחים/סלעים מרומזים)
+  for (var s = 0; s < 90; s++) {
+    c.fillStyle = "rgba(60,60,45," + (0.05 + Math.random() * 0.1) + ")";
+    var r = 0.6 + Math.random() * 1.8;
+    c.beginPath();
+    c.arc(Math.random() * 128, Math.random() * 128, r, 0, Math.PI * 2);
+    c.fill();
+  }
+  var tex = new THREE.CanvasTexture(cv);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.anisotropy = 4;
+  WORLD.groundTex = tex;
 };
 
 /* ---------- ציור מפת העולם לקנבס (משותף למיני-מפה ולדיסק הרחוק) ---------- */
@@ -251,9 +328,21 @@ WORLD.buildWorldTexture = function () {
 WORLD.buildFarDisc = function () {
   var R = 700000;   // 700 ק"מ
   var geo = new THREE.CircleGeometry(R, 48, 0, Math.PI * 2);
+  // שקיפות הדרגתית במרכז — הדיסק נמוג היכן שהצ'אנקים המפורטים מכסים,
+  // כך שאין "טבעת תפר" חדה בין הקרוב לרחוק
+  var pos = geo.attributes.position;
+  var rgba = new Float32Array(pos.count * 4);
+  for (var i = 0; i < pos.count; i++) {
+    var r = Math.sqrt(pos.getX(i) * pos.getX(i) + pos.getY(i) * pos.getY(i));
+    var a = U.clamp((r - 40000) / 70000, 0, 1);
+    rgba[i * 4] = 1; rgba[i * 4 + 1] = 1; rgba[i * 4 + 2] = 1; rgba[i * 4 + 3] = a;
+  }
+  geo.setAttribute("color", new THREE.BufferAttribute(rgba, 4));
   var tex = new THREE.CanvasTexture(WORLD.mapCanvas);
   tex.wrapS = THREE.RepeatWrapping;
-  var mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, opacity: 0, depthWrite: false, fog: false });
+  var mat = new THREE.MeshBasicMaterial({
+    map: tex, transparent: true, opacity: 0, depthWrite: false, fog: false, vertexColors: true
+  });
   var disc = new THREE.Mesh(geo, mat);
   disc.rotation.x = -Math.PI / 2;
   disc.position.y = -40;
@@ -298,13 +387,13 @@ WORLD.buildClouds = function () {
   c.fillRect(0, 0, 128, 128);
   var tex = new THREE.CanvasTexture(cv);
   var group = new THREE.Group();
-  var N = 42, BOX = 60000;
+  var N = 48, BOX = 70000;
   for (var i = 0; i < N; i++) {
-    var mat = new THREE.SpriteMaterial({ map: tex, transparent: true, opacity: 0.55 + Math.random() * 0.3, fog: true });
+    var mat = new THREE.SpriteMaterial({ map: tex, transparent: true, opacity: 0.35 + Math.random() * 0.35, fog: true, depthWrite: false });
     var s = new THREE.Sprite(mat);
-    var sc = 1500 + Math.random() * 3000;
-    s.scale.set(sc, sc * 0.35, 1);
-    s.position.set((Math.random() - 0.5) * BOX, 2200 + Math.random() * 1800, (Math.random() - 0.5) * BOX);
+    var sc = 1800 + Math.random() * 4200;
+    s.scale.set(sc, sc * (0.28 + Math.random() * 0.15), 1);
+    s.position.set((Math.random() - 0.5) * BOX, 2000 + Math.random() * 2600, (Math.random() - 0.5) * BOX);
     group.add(s);
   }
   group.userData.BOX = BOX;
@@ -469,7 +558,12 @@ WORLD.buildChunk = function (li, gi, detail) {
   }
   geo.setAttribute("color", new THREE.BufferAttribute(colors, 3));
   geo.computeVertexNormals();
-  var groundMat = new THREE.MeshLambertMaterial({ vertexColors: true });
+  // מתיחת UV כך שטקסטורת הפירוט חוזרת כל ~55 מ' — נותן לקרקע מרקם ותנועה
+  var uv = geo.attributes.uv;
+  for (var ui = 0; ui < uv.count; ui++) {
+    uv.setXY(ui, uv.getX(ui) * (w / 55), uv.getY(ui) * (h / 55));
+  }
+  var groundMat = new THREE.MeshLambertMaterial({ vertexColors: true, map: WORLD.groundTex });
   var ground = new THREE.Mesh(geo, groundMat);
   ground.receiveShadow = true;
   group.add(ground);
