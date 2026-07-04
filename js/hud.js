@@ -134,6 +134,20 @@ HUD.draw = function (ac, timeScale, camMode) {
   c.strokeRect(cx - 26, 46, 52, 20);
   c.fillText(("00" + Math.round(hdg) % 360).slice(-3) + "°", cx, 60);
 
+  /* ---- נקודת ניווט: חץ על סרט הכיוון + מרחק ---- */
+  if (window.APP && APP.waypoint) {
+    var wBrg = U.bearing(ac.lat, ac.lon, APP.waypoint.lat, APP.waypoint.lon);
+    var wDst = U.distKm(ac.lat, ac.lon, APP.waypoint.lat, APP.waypoint.lon);
+    var wdH = ((wBrg - hdg + 540) % 360) - 180;
+    c.fillStyle = "#ffd34d";
+    var wx = cx + U.clamp(wdH, -62, 62) * 2.6 * f;
+    c.beginPath();
+    c.moveTo(wx, 52); c.lineTo(wx - 5, 60); c.lineTo(wx + 5, 60);
+    c.closePath(); c.fill();
+    c.fillText("WPT " + ("00" + Math.round(wBrg)).slice(-3) + "°  " + Math.round(wDst) + " KM", cx, 80);
+    c.fillStyle = HUD.color;
+  }
+
   /* ---- סרגל מהירות (שמאל) ---- */
   var tapeX = W * (small ? 0.06 : 0.16);
   HUD.tape(c, tapeX, cy, spdKts, 10, 2.2, false, f);

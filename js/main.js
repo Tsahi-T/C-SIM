@@ -8,6 +8,7 @@ var APP = {
   renderer: null, scene: null, camera: null,
   aircraft: null,
   camMode: 0,               // 0 עוקבת, 1 תא טייס, 2 מגדל
+  waypoint: null,           // נקודת ניווט {lat, lon} — נקבעת בלחיצה על מפת העולם
   timeScaleIdx: 0,
   paused: false,
   clockMin: 10 * 60,        // שעון משחק — מתחילים ב-10:00
@@ -280,7 +281,7 @@ APP.loop = function (now) {
     APP._lastLat = ac.lat; APP._lastLon = ac.lon;
 
     WORLD.update(ac.lat, ac.lon, ac.alt, dt, moveX, moveZ);
-    MAP.markExplored(ac.lat, ac.lon, dtReal);
+    MAP.markExplored(ac.lat, ac.lon, dtReal, ac.alt);
 
     // השמש עוקבת אחרי גובה הקרקע — כדי שצל המטוס ייפול נכון בכל מקום
     WORLD.sun.position.set(600, ac.groundElev + 1000, -400);

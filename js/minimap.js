@@ -30,15 +30,32 @@ MAP.init = function () {
     var tr = localStorage.getItem("csim_trail");
     if (tr) MAP.trail = JSON.parse(tr);
   } catch (e) {}
+
+  // לחיצה על מפת העולם — קביעת/הסרת נקודת ניווט
+  MAP.world.addEventListener("click", function (e) {
+    var r = MAP.world.getBoundingClientRect();
+    var lon = (e.clientX - r.left) / r.width * 360 - 180;
+    var lat = 90 - (e.clientY - r.top) / r.height * 180;
+    if (APP.waypoint && U.distKm(lat, lon, APP.waypoint.lat, APP.waypoint.lon) < 300) {
+      APP.waypoint = null;           // לחיצה על נקודה קיימת מבטלת אותה
+      APP.alertInfo("נקודת ניווט בוטלה", 1500);
+    } else {
+      APP.waypoint = { lat: lat, lon: lon };
+      var nc = GEO.nearestCountry(lat, lon);
+      APP.alertInfo("נקודת ניווט: " + (nc.country ? nc.country.name : U.fmtCoord(lat, lon)), 2000);
+    }
+    MAP.drawWorld(APP.aircraft);
+  });
 };
 
-/* סימון תא כנחקר + שמירה תקופתית */
-MAP.markExplored = function (lat, lon, dt) {
+/* סימון תא כנחקר + שמירה תקופתית. רדיוס הגילוי גדל עם הגובה */
+MAP.markExplored = function (lat, lon, dt, alt) {
   var xi = U.clamp(Math.floor(lon + 180), 0, 359);
   var yi = U.clamp(Math.floor(lat + 90), 0, 179);
-  // רדיוס גילוי של תא אחד סביב המטוס
-  for (var dy = -1; dy <= 1; dy++) {
-    for (var dx = -1; dx <= 1; dx++) {
+  var R = U.clamp(1 + Math.floor((alt || 0) / 3000), 1, 4);
+  for (var dy = -R; dy <= R; dy++) {
+    for (var dx = -R; dx <= R; dx++) {
+      if (dx * dx + dy * dy > R * R + 1) continue;
       var x = (xi + dx + 360) % 360, y = U.clamp(yi + dy, 0, 179);
       MAP.explored[y * 360 + x] = 1;
     }
@@ -65,10 +82,11 @@ MAP.exploredPct = function () {
   return (n / MAP.explored.length * 100);
 };
 
-/* ---------- מיני-מפה: תקריב סביב המטוס, צפון למעלה ---------- */
+/* ---------- מיני-מפה עגולה, מסתובבת עם כיוון הטיסה (heading-up) ---------- */
 MAP.drawMini = function (ac) {
   var c = MAP.miniCtx, S = MAP.mini.width;
   var src = WORLD.mapCanvas;
+  var hdg = ac.getHeading();
   c.clearRect(0, 0, S, S);
 
   // גזירת אזור מהמפה העולמית
@@ -80,11 +98,18 @@ MAP.drawMini = function (ac) {
   var sw = degW / 360 * src.width, sh = degH / 180 * src.height;
 
   c.save();
+  // מסכה עגולה + סיבוב כך שכיוון הטיסה תמיד למעלה
   c.beginPath();
-  c.rect(0, 0, S, S);
+  c.arc(S / 2, S / 2, S / 2 - 1, 0, Math.PI * 2);
   c.clip();
+  c.translate(S / 2, S / 2);
+  c.rotate(-hdg * U.DEG);
+  c.translate(-S / 2, -S / 2);
   c.imageSmoothingEnabled = true;
-  c.drawImage(src, sx, sy, sw, sh, 0, 0, S, S);
+  // ציור מוגדל מעט כדי שהפינות לא ייחשפו בסיבוב
+  var pad = S * 0.21;
+  c.drawImage(src, sx - sw * 0.21, sy - sh * 0.21, sw * 1.42, sh * 1.42,
+              -pad, -pad, S + pad * 2, S + pad * 2);
 
   function toXY(lat, lon) {
     return [
@@ -133,9 +158,21 @@ MAP.drawMini = function (ac) {
     c.fillRect(p[0] - 2.5, p[1] - 2.5, 5, 5);
   }
 
-  // המטוס — משולש מסובב לפי כיוון
+  // נקודת ניווט
+  if (window.APP && APP.waypoint) {
+    var wp = toXY(APP.waypoint.lat, APP.waypoint.lon);
+    c.fillStyle = "#ffd34d";
+    c.strokeStyle = "#5c4400";
+    c.beginPath();
+    c.moveTo(wp[0], wp[1] - 6); c.lineTo(wp[0] + 5, wp[1]);
+    c.lineTo(wp[0], wp[1] + 6); c.lineTo(wp[0] - 5, wp[1]);
+    c.closePath(); c.fill(); c.stroke();
+  }
+  c.restore();   // סוף הסיבוב — מכאן והלאה מסך קבוע
+
+  // המטוס — תמיד במרכז, מצביע למעלה
+  c.save();
   c.translate(S / 2, S / 2);
-  c.rotate(ac.getHeading() * U.DEG);
   c.fillStyle = "#40ff80";
   c.strokeStyle = "#0a3018";
   c.beginPath();
@@ -144,9 +181,25 @@ MAP.drawMini = function (ac) {
   c.fill(); c.stroke();
   c.restore();
 
-  // מסגרת עדינה
-  c.strokeStyle = "rgba(120,200,255,0.4)";
-  c.strokeRect(0.5, 0.5, S - 1, S - 1);
+  // סמן צפון על השפה
+  var na = (-90 - hdg) * U.DEG;
+  var nx = S / 2 + Math.cos(na) * (S / 2 - 11);
+  var ny = S / 2 + Math.sin(na) * (S / 2 - 11);
+  c.fillStyle = "#ff8855";
+  c.font = "bold 12px 'Segoe UI'";
+  c.textAlign = "center"; c.textBaseline = "middle";
+  c.fillText("N", nx, ny);
+  c.textBaseline = "alphabetic";
+
+  // טבעת מסגרת + טווח
+  c.strokeStyle = "rgba(120,200,255,0.45)";
+  c.lineWidth = 1.5;
+  c.beginPath();
+  c.arc(S / 2, S / 2, S / 2 - 1, 0, Math.PI * 2);
+  c.stroke();
+  c.fillStyle = "rgba(180,220,255,0.8)";
+  c.font = "10px 'Segoe UI'";
+  c.fillText(Math.round(kmW) + " KM", S / 2, S - 6);
 };
 
 /* ---------- מפת עולם מלאה + ערפל גילוי ---------- */
@@ -175,7 +228,7 @@ MAP.drawWorld = function (ac) {
   }
   var fc = MAP._fogCv.getContext("2d");
   fc.clearRect(0, 0, 360, 180);
-  fc.fillStyle = "rgba(2, 8, 16, 0.8)";
+  fc.fillStyle = "rgba(3, 9, 17, 0.55)";
   for (var y = 0; y < 180; y++) {
     for (var x = 0; x < 360; x++) {
       if (!MAP.explored[y * 360 + x]) fc.fillRect(x, y, 1, 1);
@@ -183,6 +236,19 @@ MAP.drawWorld = function (ac) {
   }
   c.imageSmoothingEnabled = true;
   c.drawImage(MAP._fogCv, 0, 0, W, H);
+
+  // רשת קווי אורך/רוחב כל 30°
+  c.strokeStyle = "rgba(140, 190, 230, 0.14)";
+  c.lineWidth = 1;
+  for (var gl = -150; gl <= 150; gl += 30) {
+    var gx = (gl + 180) / 360 * W;
+    c.beginPath(); c.moveTo(gx, 0); c.lineTo(gx, H); c.stroke();
+  }
+  for (var gb = -60; gb <= 60; gb += 30) {
+    var gy = (90 - gb) / 180 * H;
+    c.strokeStyle = gb === 0 ? "rgba(140,190,230,0.28)" : "rgba(140,190,230,0.14)";
+    c.beginPath(); c.moveTo(0, gy); c.lineTo(W, gy); c.stroke();
+  }
 
   // נתיב מלא
   c.strokeStyle = "rgba(120,220,255,0.8)";
@@ -197,16 +263,16 @@ MAP.drawWorld = function (ac) {
   }
   c.stroke();
 
-  // שמות מדינות באזורים שנחקרו
+  // שמות מדינות — תמיד (לימודי); בהיר יותר באזורים שנחקרו
   c.font = Math.max(9, H / 55) + "px 'Segoe UI'";
   c.textAlign = "center";
   for (var i = 0; i < GEO.COUNTRIES.length; i++) {
     var co = GEO.COUNTRIES[i];
     var xi = U.clamp(Math.floor(co.lon + 180), 0, 359);
     var yi = U.clamp(Math.floor(co.lat + 90), 0, 179);
-    if (!MAP.explored[yi * 360 + xi]) continue;
+    var seen = MAP.explored[yi * 360 + xi];
     var p = toXY(co.lat, co.lon);
-    c.fillStyle = "rgba(255,255,255,0.85)";
+    c.fillStyle = seen ? "rgba(255,255,255,0.9)" : "rgba(200,220,240,0.35)";
     c.fillText(co.name, p[0], p[1]);
   }
   // ערים שנחקרו
@@ -222,6 +288,21 @@ MAP.drawWorld = function (ac) {
       c.fillStyle = "#ffd97a";
       c.beginPath(); c.arc(p[0], p[1], 1.6, 0, Math.PI * 2); c.fill();
     }
+  }
+
+  // נקודת ניווט + קו מהמטוס אליה
+  if (window.APP && APP.waypoint) {
+    var wpp = toXY(APP.waypoint.lat, APP.waypoint.lon);
+    var app = toXY(ac.lat, ac.lon);
+    c.strokeStyle = "rgba(255,211,77,0.6)";
+    c.setLineDash([5, 4]);
+    c.beginPath(); c.moveTo(app[0], app[1]); c.lineTo(wpp[0], wpp[1]); c.stroke();
+    c.setLineDash([]);
+    c.fillStyle = "#ffd34d"; c.strokeStyle = "#5c4400";
+    c.beginPath();
+    c.moveTo(wpp[0], wpp[1] - 7); c.lineTo(wpp[0] + 6, wpp[1]);
+    c.lineTo(wpp[0], wpp[1] + 7); c.lineTo(wpp[0] - 6, wpp[1]);
+    c.closePath(); c.fill(); c.stroke();
   }
 
   // מיקום המטוס

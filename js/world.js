@@ -270,8 +270,14 @@ WORLD.buildWorldTexture = function () {
     return [(lon + 180) / 360 * cv.width, (90 - lat) / 180 * cv.height];
   }
 
-  // אוקיינוס
-  ctx.fillStyle = "#1a4a72";
+  // אוקיינוס — גרדיאנט עומק מהקטבים לקו המשווה
+  var og = ctx.createLinearGradient(0, 0, 0, cv.height);
+  og.addColorStop(0, "#14405f");
+  og.addColorStop(0.35, "#1d5c8f");
+  og.addColorStop(0.5, "#226899");
+  og.addColorStop(0.65, "#1d5c8f");
+  og.addColorStop(1, "#14405f");
+  ctx.fillStyle = og;
   ctx.fillRect(0, 0, cv.width, cv.height);
 
   // יבשות — צבע לפי קו רוחב (חול/ירוק/שלג)
@@ -300,11 +306,25 @@ WORLD.buildWorldTexture = function () {
     }
     ctx.closePath();
     ctx.fill();
+    // קו חוף עדין
+    ctx.strokeStyle = "rgba(16, 36, 54, 0.55)";
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
   }
 
   // אנטארקטיקה
   ctx.fillStyle = "#e8eef2";
   ctx.fillRect(0, (90 + 69) / 180 * cv.height, cv.width, cv.height);
+
+  // טקסטורת נקודות עדינה ליבשות (מרקם) — קריאת פיקסלים אחת בלבד
+  var snap = ctx.getImageData(0, 0, cv.width, cv.height).data;
+  for (var sp = 0; sp < 6000; sp++) {
+    var sx = (Math.random() * cv.width) | 0, sy = (Math.random() * cv.height) | 0;
+    var pi = (sy * cv.width + sx) * 4;
+    if (snap[pi + 2] > snap[pi + 1]) continue;   // כחול = ים, לדלג
+    ctx.fillStyle = "rgba(40,50,30," + (0.04 + Math.random() * 0.08) + ")";
+    ctx.fillRect(sx, sy, 1.6, 1.6);
+  }
 
   // אגמים
   ctx.fillStyle = "#2a5a84";
