@@ -1,0 +1,139 @@
+/* C-SIM — F-35I Simulator styles */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body {
+  width: 100%; height: 100%; overflow: hidden;
+  background: #000; font-family: "Segoe UI", Arial, sans-serif;
+  touch-action: none; user-select: none; -webkit-user-select: none;
+}
+canvas#scene { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+
+/* Loading screen */
+#loading {
+  position: fixed; inset: 0; background: radial-gradient(ellipse at center, #0a1a2f 0%, #020408 100%);
+  display: flex; align-items: center; justify-content: center; z-index: 100;
+  transition: opacity 0.8s;
+}
+#loading.fade { opacity: 0; pointer-events: none; }
+.load-box { text-align: center; color: #9fd8ff; }
+.load-box h1 { font-size: 52px; letter-spacing: 12px; color: #d7ecff; }
+.load-box h2 { font-weight: 300; margin: 8px 0 24px; color: #7fb8e0; }
+.bar { width: 280px; height: 6px; background: #10263d; border-radius: 3px; margin: 0 auto 12px; overflow: hidden; }
+#loadbar { height: 100%; width: 0%; background: linear-gradient(90deg, #2e9fff, #9fe0ff); transition: width 0.3s; }
+#loadmsg { font-size: 13px; color: #6b98bd; }
+
+/* HUD */
+#hud { position: fixed; inset: 0; pointer-events: none; z-index: 10; }
+#hudCanvas { width: 100%; height: 100%; display: block; }
+
+/* Top bar */
+#topbar {
+  position: fixed; top: 10px; left: 50%; transform: translateX(-50%);
+  display: flex; gap: 18px; align-items: center; z-index: 20;
+  background: rgba(4, 14, 24, 0.55); border: 1px solid rgba(80, 180, 255, 0.25);
+  border-radius: 8px; padding: 6px 18px; color: #b8e2ff; pointer-events: none;
+}
+#locName { font-size: 16px; font-weight: 600; }
+#clock { font-size: 14px; color: #7fb8e0; direction: ltr; }
+
+/* Alerts */
+#alerts {
+  position: fixed; top: 22%; left: 50%; transform: translateX(-50%);
+  z-index: 25; text-align: center; pointer-events: none;
+}
+.alert {
+  color: #ff5544; font-size: 26px; font-weight: 700; letter-spacing: 3px;
+  text-shadow: 0 0 12px rgba(255, 60, 40, 0.7); animation: blink 0.5s infinite alternate;
+  direction: ltr;
+}
+.alert.info { color: #ffe066; font-size: 18px; animation: none; }
+@keyframes blink { from { opacity: 1; } to { opacity: 0.25; } }
+
+/* Minimap */
+#minimapBox {
+  position: fixed; bottom: 14px; left: 14px; z-index: 20;
+  background: rgba(4, 14, 24, 0.6); border: 1px solid rgba(80, 180, 255, 0.3);
+  border-radius: 10px; padding: 6px; pointer-events: none;
+}
+#minimap { display: block; border-radius: 6px; }
+#minimapLabel { text-align: center; color: #7fb8e0; font-size: 11px; margin-top: 4px; }
+
+/* World map overlay */
+#worldMapBox {
+  position: fixed; inset: 4%; z-index: 40;
+  background: rgba(3, 10, 18, 0.94); border: 1px solid rgba(80, 180, 255, 0.4);
+  border-radius: 12px; padding: 12px; display: flex; flex-direction: column;
+}
+#worldMap { flex: 1; width: 100%; border-radius: 8px; }
+#worldMapTitle { text-align: center; color: #b8e2ff; font-size: 14px; padding-top: 8px; }
+
+/* Help */
+#helpBox {
+  position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  z-index: 50; background: rgba(4, 14, 24, 0.92); border: 1px solid rgba(80, 180, 255, 0.4);
+  border-radius: 12px; padding: 22px 30px; color: #cfe8ff; max-width: 90vw; max-height: 85vh; overflow: auto;
+}
+#helpBox h2 { color: #9fd8ff; margin-bottom: 12px; text-align: center; }
+#helpBox table { border-collapse: collapse; margin-bottom: 12px; }
+#helpBox td { padding: 4px 12px; font-size: 14px; }
+#helpBox td:first-child { color: #ffe066; direction: ltr; text-align: left; font-family: monospace; white-space: nowrap; }
+#helpBox p { font-size: 13px; max-width: 420px; line-height: 1.5; }
+#helpBox .dim { color: #5f88a8; text-align: center; margin-top: 10px; }
+
+#pausedBox {
+  position: fixed; top: 40%; left: 50%; transform: translate(-50%, -50%);
+  z-index: 60; color: #ffe066; font-size: 30px; font-weight: 700;
+  text-shadow: 0 0 16px rgba(0,0,0,0.8);
+}
+
+.hidden { display: none !important; }
+
+/* ---- Mobile ---- */
+#mobileUI { position: fixed; inset: 0; z-index: 30; pointer-events: none; }
+#stickZone {
+  position: absolute; bottom: 30px; right: 24px; width: 150px; height: 150px;
+  pointer-events: auto;
+}
+#stickBase {
+  width: 100%; height: 100%; border-radius: 50%;
+  background: rgba(20, 50, 80, 0.35); border: 2px solid rgba(120, 200, 255, 0.4);
+  position: relative;
+}
+#stickKnob {
+  position: absolute; width: 56px; height: 56px; border-radius: 50%;
+  background: rgba(120, 200, 255, 0.55); border: 2px solid rgba(200, 240, 255, 0.8);
+  left: 50%; top: 50%; transform: translate(-50%, -50%);
+}
+#throttleZone {
+  position: absolute; bottom: 30px; left: 250px; width: 60px; height: 170px;
+  pointer-events: auto; text-align: center;
+}
+#throttleTrack {
+  width: 34px; height: 150px; margin: 0 auto; border-radius: 17px;
+  background: rgba(20, 50, 80, 0.35); border: 2px solid rgba(120, 200, 255, 0.4);
+  position: relative; overflow: hidden;
+}
+#throttleFill {
+  position: absolute; bottom: 0; left: 0; right: 0; height: 0%;
+  background: linear-gradient(0deg, #2e9fff, #ff9f2e);
+}
+#throttleKnob {
+  position: absolute; left: 0; right: 0; height: 14px; bottom: 0;
+  background: rgba(220, 240, 255, 0.9); border-radius: 4px;
+}
+.mlabel { color: #9fd8ff; font-size: 11px; margin-top: 4px; }
+#mobileButtons {
+  position: absolute; top: 60px; right: 12px; display: flex; flex-direction: column; gap: 8px;
+  pointer-events: auto;
+}
+#mobileButtons button {
+  background: rgba(20, 50, 80, 0.5); color: #b8e2ff; border: 1px solid rgba(120, 200, 255, 0.45);
+  border-radius: 8px; padding: 9px 14px; font-size: 13px; min-width: 78px;
+}
+#mobileButtons button.on { background: rgba(46, 159, 255, 0.55); color: #fff; }
+
+@media (max-width: 760px) {
+  #minimapBox { bottom: auto; top: 54px; left: 10px; transform: scale(0.8); transform-origin: top left; }
+  #topbar { top: 4px; padding: 4px 10px; }
+  #locName { font-size: 13px; }
+  #helpBox { font-size: 12px; padding: 14px; }
+}

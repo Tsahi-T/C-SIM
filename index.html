@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>C-SIM — סימולטור F-35I "אדיר"</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="loading">
+  <div class="load-box">
+    <h1>C-SIM</h1>
+    <h2>סימולטור F-35I "אדיר"</h2>
+    <div class="bar"><div id="loadbar"></div></div>
+    <div id="loadmsg">טוען עולם...</div>
+  </div>
+</div>
+
+<canvas id="scene"></canvas>
+
+<!-- HUD -->
+<div id="hud">
+  <canvas id="hudCanvas"></canvas>
+</div>
+
+<!-- Info panels -->
+<div id="topbar">
+  <div id="locName">ישראל</div>
+  <div id="clock">--:--</div>
+</div>
+
+<div id="alerts"></div>
+
+<!-- Minimap -->
+<div id="minimapBox">
+  <canvas id="minimap" width="220" height="220"></canvas>
+  <div id="minimapLabel">מפה (M להגדלה)</div>
+</div>
+
+<!-- Full world map overlay -->
+<div id="worldMapBox" class="hidden">
+  <canvas id="worldMap"></canvas>
+  <div id="worldMapTitle">מפת העולם — נחקר: <span id="exploredPct">0%</span> (M לסגירה)</div>
+</div>
+
+<!-- Help overlay -->
+<div id="helpBox" class="hidden">
+  <h2>הוראות טיסה</h2>
+  <table>
+    <tr><td>↑ / ↓ או W / S</td><td>הגה גובה (פיץ')</td></tr>
+    <tr><td>← / → או A / D</td><td>גלגול (רול)</td></tr>
+    <tr><td>Q / E</td><td>הגה כיוון (יאו)</td></tr>
+    <tr><td>Shift / Ctrl</td><td>מצערת + / −</td></tr>
+    <tr><td>Tab</td><td>מבער אחורי (אפטרברנר)</td></tr>
+    <tr><td>G</td><td>כן נסע (גלגלים)</td></tr>
+    <tr><td>F</td><td>מדפים (פלאפים)</td></tr>
+    <tr><td>B</td><td>בלמים (על הקרקע)</td></tr>
+    <tr><td>C</td><td>מצלמה (תא טייס / חיצונית / מסלול)</td></tr>
+    <tr><td>M</td><td>מפת עולם</td></tr>
+    <tr><td>T</td><td>האצת זמן ×1 / ×5 / ×20</td></tr>
+    <tr><td>P</td><td>השהיה</td></tr>
+    <tr><td>H</td><td>עזרה זו</td></tr>
+  </table>
+  <p>המראה: בלמים B לשחרור, מצערת מלאה (החזק Shift), במהירות ~150 קשר משוך קלות (↓ או S), ואז G להעלאת גלגלים.</p>
+  <p class="dim">לחץ H לסגירה</p>
+</div>
+
+<!-- Mobile controls -->
+<div id="mobileUI" class="hidden">
+  <div id="stickZone"><div id="stickBase"><div id="stickKnob"></div></div></div>
+  <div id="throttleZone">
+    <div id="throttleTrack"><div id="throttleFill"></div><div id="throttleKnob"></div></div>
+    <div class="mlabel">מצערת</div>
+  </div>
+  <div id="mobileButtons">
+    <button id="mbGear">גלגלים</button>
+    <button id="mbBrake">בלמים</button>
+    <button id="mbAB">מבער</button>
+    <button id="mbCam">מצלמה</button>
+    <button id="mbMap">מפה</button>
+    <button id="mbRudL">◄ הגה</button>
+    <button id="mbRudR">הגה ►</button>
+  </div>
+</div>
+
+<div id="pausedBox" class="hidden">מושהה — P להמשך</div>
+
+<!-- Three.js (UMD build) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.158.0/three.min.js"></script>
+<script src="js/config.js"></script>
+<script src="js/geodata.js"></script>
+<script src="js/aircraft.js"></script>
+<script src="js/world.js"></script>
+<script src="js/hud.js"></script>
+<script src="js/minimap.js"></script>
+<script src="js/controls.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
