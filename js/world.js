@@ -149,11 +149,19 @@ WORLD.init = function (scene) {
   }
 
   // תאורה
-  var hemi = new THREE.HemisphereLight(0xcfe8ff, 0x54503c, 0.85);
+  var hemi = new THREE.HemisphereLight(0xcfe8ff, 0x5e594a, 1.05);
   scene.add(hemi);
-  var sun = new THREE.DirectionalLight(0xfff2dd, 1.15);
-  sun.position.set(3000, 5000, -2000);
+  var sun = new THREE.DirectionalLight(0xfff2dd, 0.95);
+  sun.position.set(600, 1000, -400);
+  sun.castShadow = true;
+  sun.shadow.mapSize.set(2048, 2048);
+  sun.shadow.camera.left = -90; sun.shadow.camera.right = 90;
+  sun.shadow.camera.top = 90; sun.shadow.camera.bottom = -90;
+  sun.shadow.camera.near = 400;
+  sun.shadow.camera.far = 2500;
+  sun.shadow.bias = -0.0005;
   scene.add(sun);
+  scene.add(sun.target);
   WORLD.sun = sun;
 
   scene.background = new THREE.Color(CFG.SKY_HORIZON);
@@ -326,6 +334,7 @@ WORLD.buildAirports = function () {
     var L = 2900, W = 45;
     var rw = new THREE.Mesh(new THREE.BoxGeometry(W, 0.6, L), runwayMat);
     rw.position.y = 0.3;
+    rw.receiveShadow = true;
     g.add(rw);
     // קו אמצע מקווקו
     for (var s = -L / 2 + 100; s < L / 2 - 100; s += 200) {
@@ -344,6 +353,7 @@ WORLD.buildAirports = function () {
     // מסלול הסעה ורחבה
     var apron = new THREE.Mesh(new THREE.BoxGeometry(220, 0.4, 160), runwayMat);
     apron.position.set(W / 2 + 150, 0.2, L * 0.25);
+    apron.receiveShadow = true;
     g.add(apron);
     var taxi = new THREE.Mesh(new THREE.BoxGeometry(150, 0.4, 20), runwayMat);
     taxi.position.set(W / 2 + 75, 0.2, L * 0.25);
@@ -461,6 +471,7 @@ WORLD.buildChunk = function (li, gi, detail) {
   geo.computeVertexNormals();
   var groundMat = new THREE.MeshLambertMaterial({ vertexColors: true });
   var ground = new THREE.Mesh(geo, groundMat);
+  ground.receiveShadow = true;
   group.add(ground);
 
   /* --- תוכן מפורט (רק בצ'אנקים קרובים על יבשה) --- */

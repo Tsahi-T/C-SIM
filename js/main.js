@@ -27,6 +27,8 @@ APP.init = function () {
   APP.renderer = new THREE.WebGLRenderer({ canvas: document.getElementById("scene"), antialias: true });
   APP.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   APP.renderer.setSize(window.innerWidth, window.innerHeight);
+  APP.renderer.shadowMap.enabled = true;
+  APP.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
   APP.scene = new THREE.Scene();
   APP.camera = new THREE.PerspectiveCamera(62, window.innerWidth / window.innerHeight, 0.5, 2500000);
@@ -268,6 +270,10 @@ APP.loop = function (now) {
 
     WORLD.update(ac.lat, ac.lon, ac.alt, dt, moveX, moveZ);
     MAP.markExplored(ac.lat, ac.lon, dtReal);
+
+    // השמש עוקבת אחרי גובה הקרקע — כדי שצל המטוס ייפול נכון בכל מקום
+    WORLD.sun.position.set(600, ac.groundElev + 1000, -400);
+    WORLD.sun.target.position.set(0, ac.groundElev, 0);
 
     // שעון משחק
     APP.clockMin += dt / 60;

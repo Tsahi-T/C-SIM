@@ -1,148 +1,331 @@
 /* =========================================================
    C-SIM — aircraft.js
-   מודל תלת-ממד של F-35I ("אדיר") מפרימיטיבים + מודל טיסה.
+   מודל תלת-ממד של מטוס קרב מפרימיטיבים + מודל טיסה.
    מערכת צירים: קדימה = ‎-Z, למעלה = +Y, ימין = +X.
    ========================================================= */
 "use strict";
 
 /* ---------- בניית המודל התלת-ממדי ---------- */
-function buildF35() {
-  var g = new THREE.Group();
-  var gray = new THREE.MeshLambertMaterial({ color: 0x5a616b });
-  var dark = new THREE.MeshLambertMaterial({ color: 0x3a3f47 });
-  var glass = new THREE.MeshLambertMaterial({ color: 0x6a5a1e, transparent: true, opacity: 0.85 });
-  var black = new THREE.MeshLambertMaterial({ color: 0x1c1c20 });
 
-  // גוף מרכזי — קופסה מחודדת בעזרת סקייל של ורטקסים
-  var fusGeo = new THREE.BoxGeometry(2.2, 1.35, 15.7, 1, 1, 6);
-  var pos = fusGeo.attributes.position;
-  for (var i = 0; i < pos.count; i++) {
-    var z = pos.getZ(i), x = pos.getX(i), y = pos.getY(i);
-    var t = (z + 7.85) / 15.7;             // 0 באף, 1 בזנב
-    var w = 1.0;
-    if (t < 0.25) w = 0.25 + 3.0 * t;      // חידוד האף
-    else if (t > 0.8) w = 1.0 - (t - 0.8) * 1.2;
-    pos.setX(i, x * w);
-    pos.setY(i, y * (t < 0.2 ? 0.45 + 2.7 * t : 1.0));
+// "לופט" — בניית גוף מחתכי רוחב לאורך ציר Z (הטכניקה של גוף מטוס אמיתי)
+function loftGeometry(profile, sections) {
+  var N = profile.length, S = sections.length;
+  var positions = new Float32Array(N * S * 3);
+  var k = 0;
+  for (var s = 0; s < S; s++) {
+    var sec = sections[s];
+    for (var i = 0; i < N; i++) {
+      positions[k++] = profile[i][0] * sec.sx;
+      positions[k++] = profile[i][1] * sec.sy + sec.y;
+      positions[k++] = sec.z;
+    }
   }
-  fusGeo.computeVertexNormals();
-  var fus = new THREE.Mesh(fusGeo, gray);
+  var indices = [];
+  for (var s = 0; s < S - 1; s++) {
+    for (var i = 0; i < N; i++) {
+      var a = s * N + i, b = s * N + (i + 1) % N;
+      var c = (s + 1) * N + i, d = (s + 1) * N + (i + 1) % N;
+      indices.push(a, b, d, a, d, c);
+    }
+  }
+  var geo = new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+  geo.setIndex(indices);
+  geo.computeVertexNormals();
+  return geo;
+}
+
+// טקסטורת סמל חיל האוויר (מגן דוד בעיגול) לכנפיים
+function makeRoundelTexture() {
+  var cv = document.createElement("canvas");
+  cv.width = cv.height = 128;
+  var c = cv.getContext("2d");
+  c.clearRect(0, 0, 128, 128);
+  c.beginPath(); c.arc(64, 64, 56, 0, Math.PI * 2);
+  c.fillStyle = "#ffffff"; c.fill();
+  c.lineWidth = 6; c.strokeStyle = "#0038b8"; c.stroke();
+  c.lineWidth = 7; c.lineJoin = "round";
+  c.beginPath();  // משולש עליון
+  c.moveTo(64, 22); c.lineTo(100, 84); c.lineTo(28, 84); c.closePath(); c.stroke();
+  c.beginPath();  // משולש תחתון
+  c.moveTo(64, 106); c.lineTo(28, 44); c.lineTo(100, 44); c.closePath(); c.stroke();
+  var tex = new THREE.CanvasTexture(cv);
+  tex.anisotropy = 4;
+  return tex;
+}
+
+function buildJet() {
+  var g = new THREE.Group();
+  // אפור מטוס קרב רך עם ברק מתכתי עדין
+  var body = new THREE.MeshPhongMaterial({ color: 0x5d6269, specular: 0x24272c, shininess: 24 });
+  var dark = new THREE.MeshPhongMaterial({ color: 0x33373d, specular: 0x1a1d22, shininess: 20 });
+  var black = new THREE.MeshPhongMaterial({ color: 0x17181c, specular: 0x111111, shininess: 12 });
+  // חופה כהה מבריקה — עדין, בלי צבע בולט
+  var glass = new THREE.MeshPhongMaterial({
+    color: 0x222a36, specular: 0xaabbcc, shininess: 150
+  });
+
+  /* --- הגוף: לופט עם קווי chine — חתך מעוין של מטוס חמקן --- */
+  var profile = [
+    [1.00, 0.00], [0.90, 0.24], [0.66, 0.44], [0.36, 0.56], [0, 0.62],
+    [-0.36, 0.56], [-0.66, 0.44], [-0.90, 0.24], [-1.00, 0.00],
+    [-0.86, -0.20], [-0.52, -0.36], [0, -0.42], [0.52, -0.36], [0.86, -0.20]
+  ];
+  var sections = [
+    { z: -9.35, sx: 0.02, sy: 0.02, y: 0.08 },
+    { z: -8.60, sx: 0.24, sy: 0.26, y: 0.08 },
+    { z: -7.40, sx: 0.48, sy: 0.48, y: 0.10 },
+    { z: -6.00, sx: 0.82, sy: 0.76, y: 0.13 },
+    { z: -4.40, sx: 1.20, sy: 1.05, y: 0.14 },
+    { z: -2.60, sx: 1.52, sy: 1.28, y: 0.09 },
+    { z: -0.60, sx: 1.66, sy: 1.38, y: 0.02 },
+    { z: 1.60, sx: 1.64, sy: 1.36, y: 0.00 },
+    { z: 3.80, sx: 1.48, sy: 1.24, y: 0.00 },
+    { z: 5.80, sx: 1.12, sy: 1.00, y: 0.02 },
+    { z: 7.20, sx: 0.82, sy: 0.82, y: 0.02 },
+    { z: 8.20, sx: 0.58, sy: 0.62, y: 0.02 }
+  ];
+  var fus = new THREE.Mesh(loftGeometry(profile, sections), body);
   g.add(fus);
 
-  // חרטום מחודד
-  var nose = new THREE.Mesh(new THREE.ConeGeometry(0.55, 2.4, 10), gray);
-  nose.rotation.x = -Math.PI / 2;
-  nose.position.set(0, 0.05, -9.0);
-  g.add(nose);
+  // סגירת הזנב מאחורי הנחיר
+  var tailCap = new THREE.Mesh(new THREE.CircleGeometry(0.68, 16), dark);
+  tailCap.position.set(0, 0.02, 8.21);
+  g.add(tailCap);
 
-  // חופה
-  var canopy = new THREE.Mesh(new THREE.SphereGeometry(0.72, 12, 8), glass);
-  canopy.scale.set(0.8, 0.75, 2.2);
-  canopy.position.set(0, 0.75, -4.6);
+  // חטוטרת גב (spine) מאחורי החופה — נמוכה ומתמזגת
+  var spine = new THREE.Mesh(new THREE.SphereGeometry(1, 12, 8), body);
+  spine.scale.set(0.48, 0.26, 2.4);
+  spine.position.set(0, 0.62, -1.3);
+  g.add(spine);
+
+  /* --- חופה: טיפת דמעה מוארכת, כהה ומבריקה --- */
+  var canopy = new THREE.Mesh(new THREE.SphereGeometry(1, 18, 14), glass);
+  canopy.scale.set(0.48, 0.5, 1.75);
+  canopy.position.set(0, 0.62, -4.7);
   g.add(canopy);
+  // מסגרת קשת דקה
+  var bow = new THREE.Mesh(new THREE.TorusGeometry(0.46, 0.028, 6, 16, Math.PI), dark);
+  bow.rotation.y = Math.PI / 2;
+  bow.rotation.z = Math.PI / 2;
+  bow.position.set(0, 0.62, -4.0);
+  g.add(bow);
 
-  // כניסות אוויר משני הצדדים
-  var intakeGeo = new THREE.BoxGeometry(0.75, 0.9, 3.2);
-  var inL = new THREE.Mesh(intakeGeo, dark); inL.position.set(-1.35, -0.15, -2.2); g.add(inL);
-  var inR = new THREE.Mesh(intakeGeo, dark); inR.position.set(1.35, -0.15, -2.2); g.add(inR);
+  /* --- כניסות אוויר עדינות בצידי הגוף --- */
+  for (var side = -1; side <= 1; side += 2) {
+    var bump = new THREE.Mesh(new THREE.SphereGeometry(0.5, 10, 8), body);
+    bump.scale.set(0.45, 0.42, 1.15);
+    bump.position.set(side * 1.1, -0.08, -3.0);
+    g.add(bump);
+    var mouth = new THREE.Mesh(new THREE.PlaneGeometry(0.55, 0.75), black);
+    mouth.position.set(side * 1.32, -0.05, -3.35);
+    mouth.rotation.y = side * 0.6;
+    g.add(mouth);
+  }
 
-  // כנפיים — צורת טרפז
+  /* --- כנפיים עם קצוות מעוגלים (bevel) וסחיפה של 33° --- */
   function wingMesh(mirror) {
     var s = new THREE.Shape();
-    s.moveTo(0, 2.6);         // שורש קדמי (x=span, y=חיובי קדימה)
-    s.lineTo(5.2, -0.4);      // קצה קדמי
-    s.lineTo(5.2, -1.5);      // קצה אחורי
-    s.lineTo(0, -2.6);        // שורש אחורי
-    s.lineTo(0, 2.6);
-    var geo = new THREE.ExtrudeGeometry(s, { depth: 0.14, bevelEnabled: false });
-    geo.rotateX(Math.PI / 2); // מישור אופקי, y-shape -> -z
-    var m = new THREE.Mesh(geo, gray);
+    s.moveTo(0, 2.7);          // שורש, מקדימה
+    s.lineTo(3.9, 0.25);       // קצה מוביל סחוף
+    s.lineTo(3.9, -1.05);      // מיתר קצה
+    s.lineTo(0, -2.7);         // שורש, מאחורה
+    s.lineTo(0, 2.7);
+    var geo = new THREE.ExtrudeGeometry(s, {
+      depth: 0.13, bevelEnabled: true, bevelThickness: 0.06, bevelSize: 0.09, bevelSegments: 1
+    });
+    geo.rotateX(Math.PI / 2);
+    var m = new THREE.Mesh(geo, body);
     if (mirror) m.scale.x = -1;
-    m.position.set(mirror ? -1.0 : 1.0, -0.1, 0.6);
+    m.position.set(mirror ? -1.5 : 1.5, 0.0, 0.55);
     return m;
   }
   g.add(wingMesh(false));
   g.add(wingMesh(true));
 
-  // מייצבים אופקיים אחוריים
+  // עיטורים קטנים ועדינים על הכנפיים
+  var roundelTex = makeRoundelTexture();
+  for (var side = -1; side <= 1; side += 2) {
+    var dec = new THREE.Mesh(new THREE.PlaneGeometry(1.1, 1.1),
+      new THREE.MeshLambertMaterial({
+        map: roundelTex, transparent: true, opacity: 0.85,
+        polygonOffset: true, polygonOffsetFactor: -4
+      }));
+    dec.rotation.x = -Math.PI / 2;
+    dec.position.set(side * 3.5, 0.21, 0.75);
+    g.add(dec);
+  }
+
+  /* --- מייצבים אופקיים --- */
   function stab(mirror) {
     var s = new THREE.Shape();
-    s.moveTo(0, 1.2); s.lineTo(2.6, -0.3); s.lineTo(2.6, -0.9); s.lineTo(0, -1.2); s.lineTo(0, 1.2);
-    var geo = new THREE.ExtrudeGeometry(s, { depth: 0.1, bevelEnabled: false });
+    s.moveTo(0, 1.25); s.lineTo(2.15, 0.05); s.lineTo(2.15, -0.75); s.lineTo(0, -1.25); s.lineTo(0, 1.25);
+    var geo = new THREE.ExtrudeGeometry(s, {
+      depth: 0.09, bevelEnabled: true, bevelThickness: 0.04, bevelSize: 0.06, bevelSegments: 1
+    });
     geo.rotateX(Math.PI / 2);
-    var m = new THREE.Mesh(geo, gray);
+    var m = new THREE.Mesh(geo, body);
     if (mirror) m.scale.x = -1;
-    m.position.set(mirror ? -0.9 : 0.9, -0.05, 6.6);
+    m.position.set(mirror ? -0.95 : 0.95, -0.02, 6.5);
     return m;
   }
   g.add(stab(false));
   g.add(stab(true));
 
-  // זנבות אנכיים מוטים (מאפיין בולט של F-35)
+  /* --- זנבות אנכיים מוטים החוצה --- */
   function tail(mirror) {
     var s = new THREE.Shape();
-    s.moveTo(0, 1.6); s.lineTo(2.6, 0.2); s.lineTo(2.6, -0.8); s.lineTo(0, -1.4); s.lineTo(0, 1.6);
-    var geo = new THREE.ExtrudeGeometry(s, { depth: 0.09, bevelEnabled: false });
-    geo.rotateY(Math.PI / 2);   // מישור אנכי לאורך הגוף
-    var m = new THREE.Mesh(geo, gray);
-    m.position.set(mirror ? -0.95 : 0.95, 0.5, 5.2);
-    m.rotation.z = (mirror ? -1 : 1) * 0.35;  // הטיה החוצה
+    s.moveTo(0, 1.55); s.lineTo(2.45, 0.15); s.lineTo(2.45, -0.85); s.lineTo(0, -1.5); s.lineTo(0, 1.55);
+    var geo = new THREE.ExtrudeGeometry(s, {
+      depth: 0.08, bevelEnabled: true, bevelThickness: 0.03, bevelSize: 0.05, bevelSegments: 1
+    });
+    geo.rotateY(Math.PI / 2);
+    var m = new THREE.Mesh(geo, body);
+    m.position.set(mirror ? -1.05 : 1.05, 0.5, 5.1);
+    m.rotation.z = (mirror ? -1 : 1) * 0.42;   // כ-24° הטיה
     return m;
   }
   g.add(tail(false));
   g.add(tail(true));
 
-  // נחיר מנוע
-  var nozzle = new THREE.Mesh(new THREE.CylinderGeometry(0.52, 0.62, 1.4, 12), black);
-  nozzle.rotation.x = Math.PI / 2;
-  nozzle.position.set(0, 0, 8.1);
-  g.add(nozzle);
+  /* --- דלתות תא חימוש פנימי (קווים בגחון) --- */
+  for (var side = -1; side <= 1; side += 2) {
+    var bay = new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.02, 2.9),
+      new THREE.MeshPhongMaterial({ color: 0x54595f, shininess: 22 }));
+    bay.position.set(side * 0.68, -0.585, 0.8);
+    g.add(bay);
+  }
 
-  // להבת מבער אחורי
-  var flameMat = new THREE.MeshBasicMaterial({ color: 0xff7722, transparent: true, opacity: 0.85 });
-  var flame = new THREE.Mesh(new THREE.ConeGeometry(0.45, 3.2, 10), flameMat);
-  flame.rotation.x = Math.PI / 2;   // חוד הלהבה אחורה
-  flame.position.set(0, 0, 10.4);
+  /* --- נחיר מנוע קצר ומעודן + זוהר --- */
+  var nozzleMat = new THREE.MeshPhongMaterial({ color: 0x3b3d40, specular: 0x555555, shininess: 45 });
+  var nozzle = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.52, 0.7, 16), nozzleMat);
+  nozzle.rotation.x = Math.PI / 2;
+  nozzle.position.set(0, 0.02, 8.45);
+  g.add(nozzle);
+  var nozzleInner = new THREE.Mesh(new THREE.CylinderGeometry(0.36, 0.42, 0.45, 16),
+    new THREE.MeshPhongMaterial({ color: 0x232022, shininess: 8 }));
+  nozzleInner.rotation.x = Math.PI / 2;
+  nozzleInner.position.set(0, 0.02, 8.7);
+  g.add(nozzleInner);
+  // דיסקת זוהר — מתחממת עם המצערת
+  var glowMat = new THREE.MeshBasicMaterial({ color: 0xff5511, transparent: true, opacity: 0 });
+  var nozzleGlow = new THREE.Mesh(new THREE.CircleGeometry(0.34, 16), glowMat);
+  nozzleGlow.position.set(0, 0.02, 8.94);
+  g.add(nozzleGlow);
+
+  /* --- להבת מבער עדינה: מעטפת שקופה + ליבה + יהלומי הלם קטנים --- */
+  var flame = new THREE.Group();
+  var flameOuter = new THREE.Mesh(new THREE.ConeGeometry(0.4, 2.9, 12),
+    new THREE.MeshBasicMaterial({ color: 0xff7a30, transparent: true, opacity: 0.38, depthWrite: false }));
+  flameOuter.rotation.x = Math.PI / 2;
+  flameOuter.position.z = 1.45;
+  flame.add(flameOuter);
+  var flameCore = new THREE.Mesh(new THREE.ConeGeometry(0.2, 1.9, 10),
+    new THREE.MeshBasicMaterial({ color: 0xffe9b0, transparent: true, opacity: 0.7, depthWrite: false }));
+  flameCore.rotation.x = Math.PI / 2;
+  flameCore.position.z = 0.95;
+  flame.add(flameCore);
+  for (var di = 0; di < 3; di++) {
+    var dia = new THREE.Mesh(new THREE.SphereGeometry(0.11 - di * 0.02, 8, 6),
+      new THREE.MeshBasicMaterial({ color: 0xbfe0ff, transparent: true, opacity: 0.5, depthWrite: false }));
+    dia.scale.set(1, 1, 1.7);
+    dia.position.z = 0.7 + di * 0.7;
+    flame.add(dia);
+  }
+  // הילת זוהר מרוככת
+  var glowCv = document.createElement("canvas");
+  glowCv.width = glowCv.height = 64;
+  var gc = glowCv.getContext("2d");
+  var grd = gc.createRadialGradient(32, 32, 2, 32, 32, 30);
+  grd.addColorStop(0, "rgba(255,180,90,0.55)");
+  grd.addColorStop(0.5, "rgba(255,120,40,0.18)");
+  grd.addColorStop(1, "rgba(255,90,20,0)");
+  gc.fillStyle = grd; gc.fillRect(0, 0, 64, 64);
+  var glowSprite = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: new THREE.CanvasTexture(glowCv), transparent: true,
+    blending: THREE.AdditiveBlending, depthWrite: false
+  }));
+  glowSprite.scale.set(2.0, 2.0, 1);
+  glowSprite.position.z = 0.5;
+  flame.add(glowSprite);
+  flame.position.set(0, 0.02, 8.95);
   flame.visible = false;
   g.add(flame);
 
-  // כן נסע — שלוש רגליים
+  /* --- כן נסע מפורט: בוכנה, מוט תמיכה, דלתות --- */
   var gearGroup = new THREE.Group();
+  var metal = new THREE.MeshPhongMaterial({ color: 0xb8bcc2, specular: 0x888888, shininess: 60 });
+  var tire = new THREE.MeshPhongMaterial({ color: 0x181a1c, shininess: 5 });
+  var hub = new THREE.MeshPhongMaterial({ color: 0x8f939a, shininess: 50 });
+
   function leg(x, z, front) {
     var lg = new THREE.Group();
-    var strut = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, front ? 1.7 : 1.5, 6), dark);
-    strut.position.y = -(front ? 0.85 : 0.75);
+    var len = front ? 1.7 : 1.5;
+    // בוכנה ראשית
+    var strut = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.09, len, 8), metal);
+    strut.position.y = -len / 2;
     lg.add(strut);
-    var wheel = new THREE.Mesh(new THREE.CylinderGeometry(front ? 0.3 : 0.42, front ? 0.3 : 0.42, 0.25, 12), black);
+    // מוט תמיכה אלכסוני
+    var brace = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, len * 0.85, 6), metal);
+    brace.position.set(0, -len * 0.45, front ? 0.42 : -0.4);
+    brace.rotation.x = front ? -0.5 : 0.5;
+    lg.add(brace);
+    // גלגל(ים) עם צלחת
+    var wr = front ? 0.28 : 0.42, ww = front ? 0.18 : 0.3;
+    var wheel = new THREE.Mesh(new THREE.CylinderGeometry(wr, wr, ww, 16), tire);
     wheel.rotation.z = Math.PI / 2;
-    wheel.position.y = -(front ? 1.7 : 1.5);
+    wheel.position.y = -len;
     lg.add(wheel);
-    lg.position.set(x, -0.6, z);
+    var cap = new THREE.Mesh(new THREE.CylinderGeometry(wr * 0.55, wr * 0.55, ww + 0.03, 12), hub);
+    cap.rotation.z = Math.PI / 2;
+    cap.position.y = -len;
+    lg.add(cap);
+    // דלת כן נסע צמודה
+    var door = new THREE.Mesh(new THREE.BoxGeometry(0.05, len * 0.9, front ? 0.55 : 0.85), body);
+    door.position.set(front ? 0.28 : (x > 0 ? 0.34 : -0.34), -len * 0.45, 0);
+    door.rotation.y = front ? 0 : (x > 0 ? -0.15 : 0.15);
+    lg.add(door);
+    // פנס נחיתה על רגל האף
+    if (front) {
+      var lamp = new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 6),
+        new THREE.MeshBasicMaterial({ color: 0xfff8dd }));
+      lamp.position.set(0, -len * 0.65, -0.12);
+      lg.add(lamp);
+    }
+    lg.position.set(x, -0.45, z);
     return lg;
   }
-  gearGroup.add(leg(0, -5.6, true));
-  gearGroup.add(leg(-1.5, 1.2, false));
-  gearGroup.add(leg(1.5, 1.2, false));
+  gearGroup.add(leg(0, -5.4, true));
+  gearGroup.add(leg(-1.6, 1.2, false));
+  gearGroup.add(leg(1.6, 1.2, false));
   g.add(gearGroup);
 
-  // אורות ניווט
-  var navL = new THREE.Mesh(new THREE.SphereGeometry(0.09, 6, 6),
-    new THREE.MeshBasicMaterial({ color: 0xff2222 }));
-  navL.position.set(-6.0, -0.05, 0.3); g.add(navL);
-  var navR = new THREE.Mesh(new THREE.SphereGeometry(0.09, 6, 6),
-    new THREE.MeshBasicMaterial({ color: 0x22ff44 }));
-  navR.position.set(6.0, -0.05, 0.3); g.add(navR);
-  var strobe = new THREE.Mesh(new THREE.SphereGeometry(0.08, 6, 6),
+  /* --- אורות ניווט קטנים --- */
+  var navL = new THREE.Mesh(new THREE.SphereGeometry(0.06, 6, 6),
+    new THREE.MeshBasicMaterial({ color: 0xff3333 }));
+  navL.position.set(-5.35, 0.05, 0.55); g.add(navL);
+  var navR = new THREE.Mesh(new THREE.SphereGeometry(0.06, 6, 6),
+    new THREE.MeshBasicMaterial({ color: 0x33ff55 }));
+  navR.position.set(5.35, 0.05, 0.55); g.add(navR);
+  var strobe = new THREE.Mesh(new THREE.SphereGeometry(0.05, 6, 6),
     new THREE.MeshBasicMaterial({ color: 0xffffff }));
-  strobe.position.set(0, 1.05, 5.0); g.add(strobe);
+  strobe.position.set(0, 0.85, 3.6); g.add(strobe);
 
-  return { group: g, flame: flame, gearGroup: gearGroup, strobe: strobe };
+  // המטוס מטיל צל (הלהבה, הזוהר והאורות לא)
+  g.traverse(function (o) {
+    if (o.isMesh && o.material && !o.material.transparent &&
+        o.material.type !== "MeshBasicMaterial") {
+      o.castShadow = true;
+    }
+  });
+
+  return { group: g, flame: flame, gearGroup: gearGroup, strobe: strobe, nozzleGlow: glowMat };
 }
 
 /* ---------- מודל טיסה ---------- */
 function Aircraft() {
   var P = CFG.PLANE;
-  var model = buildF35();
+  var model = buildJet();
   this.model = model;
   this.group = model.group;
 
@@ -322,7 +505,7 @@ Aircraft.prototype.update = function (dt, ctl, groundElev) {
     var rollRate = ctl.roll * P.ROLL_RATE * eff;
     var yawRate = ctl.yaw * P.YAW_RATE * eff;
     if (this.stalled) { pitchRate *= 0.4; rollRate *= 0.35; }
-    // הגבלת G בסיסית (FCS של F-35 מגביל ל-9G)
+    // הגבלת G בסיסית (מערכת בקרת הטיסה מגבילה ל-9G)
     if (gForce > 8.5 && pitchRate < 0) pitchRate *= 0.15;
 
     var dq = new THREE.Quaternion();
@@ -390,6 +573,8 @@ Aircraft.prototype.update = function (dt, ctl, groundElev) {
   if (this.model.flame.visible) {
     this.model.flame.scale.setScalar(0.85 + Math.random() * 0.3);
   }
+  // זוהר הנחיר מתחמם עם המצערת — עדין
+  this.model.nozzleGlow.opacity = this.throttle * 0.22 + (this.model.flame.visible ? 0.4 : 0);
   this.model.gearGroup.visible = this.gearDown;
   this.model.strobe.visible = (Date.now() % 1000) < 80;
 
