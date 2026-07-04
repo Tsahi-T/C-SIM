@@ -396,13 +396,18 @@ Aircraft.prototype.mach = function () {
   update — צעד פיזיקה אחד.
   ctl: { pitch, roll, yaw ∈ [-1,1], throttleDelta }
   groundElev: גובה קרקע במיקום הנוכחי
+  timeScale: קצב האצת הזמן הנוכחי (מ-CFG.TIME_SCALES). תנועה/מרחק מתקדמים
+  לפי dt המלא (מואץ), אבל היגוי (פיץ'/רול/יאו) משתמש ב"attDt" — dt מוקטן
+  בהתאם לקצב ההאצה — כדי שהמטוס יגיב לבקרה בקצב זמן-אמת קבוע ולא "יתפרע"
+  כשמאיצים את הזמן (אחרת קלט הגה קצר הופך לעשרות שניות של סיבוב מצטבר).
   מחזיר אירועים: { touchdown, crash, gearWarning }
 */
-Aircraft.prototype.update = function (dt, ctl, groundElev) {
+Aircraft.prototype.update = function (dt, ctl, groundElev, timeScale) {
   if (this.crashed) return {};
   var P = CFG.PLANE;
   var ev = {};
   this.groundElev = groundElev;
+  var attDt = (timeScale && timeScale > 1) ? dt / timeScale : dt;
 
   // מצערת
   this.throttle = U.clamp(this.throttle + ctl.throttleDelta * dt * 0.5, 0, 1);
@@ -475,7 +480,7 @@ Aircraft.prototype.update = function (dt, ctl, groundElev) {
     // היגוי על הקרקע
     if (v > 0.5) {
       var steer = ctl.yaw * U.clamp(14 / (v + 4), 0.15, 1.2);
-      var yawQ = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), -steer * dt);
+      var yawQ = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), -steer * attDt);
       this.quat.premultiply(yawQ);
       // המהירות עוקבת אחרי הכיוון בגלגול על הקרקע
       var newFwd = this._tmp.set(0, 0, -1).applyQuaternion(this.quat);
@@ -484,13 +489,13 @@ Aircraft.prototype.update = function (dt, ctl, groundElev) {
     }
     // רוטציה — הרמת אף מעל מהירות ניתוק
     if (ctl.pitch < -0.05 && v > P.STALL_SPEED_FLAPS * 0.95) {
-      var rotQ = new THREE.Quaternion().setFromAxisAngle(right, -ctl.pitch * dt * 0.8);
+      var rotQ = new THREE.Quaternion().setFromAxisAngle(right, -ctl.pitch * attDt * 0.8);
       this.quat.premultiply(rotQ);
     } else {
       // הצמדת האף לקרקע
       var pitchNow = this.getPitchDeg();
       if (pitchNow > 0 && lift < P.MASS * 9.81 * 0.9) {
-        var dnQ = new THREE.Quaternion().setFromAxisAngle(right, -U.clamp(pitchNow, 0, 12) * U.DEG * dt * 2);
+        var dnQ = new THREE.Quaternion().setFromAxisAngle(right, -U.clamp(pitchNow, 0, 12) * U.DEG * attDt * 2);
         this.quat.premultiply(dnQ);
       }
     }
@@ -509,9 +514,9 @@ Aircraft.prototype.update = function (dt, ctl, groundElev) {
     if (gForce > 8.5 && pitchRate < 0) pitchRate *= 0.15;
 
     var dq = new THREE.Quaternion();
-    dq.setFromAxisAngle(right, -pitchRate * dt); this.quat.premultiply(dq);
-    dq.setFromAxisAngle(fwd, -rollRate * dt); this.quat.premultiply(dq);
-    dq.setFromAxisAngle(up, -yawRate * dt); this.quat.premultiply(dq);
+    dq.setFromAxisAngle(right, -pitchRate * attDt); this.quat.premultiply(dq);
+    dq.setFromAxisAngle(fwd, -rollRate * attDt); this.quat.premultiply(dq);
+    dq.setFromAxisAngle(up, -yawRate * attDt); this.quat.premultiply(dq);
 
     // יציבות טבעית קלה — האף נוטה לכיוון וקטור המהירות
     if (v > 30 && !this.stalled) {
@@ -519,8 +524,21 @@ Aircraft.prototype.update = function (dt, ctl, groundElev) {
       var cur = new THREE.Quaternion().copy(this.quat);
       var look = new THREE.Matrix4().lookAt(new THREE.Vector3(0,0,0), vdir2, up);
       var target = new THREE.Quaternion().setFromRotationMatrix(look);
-      this.quat.slerp(target, U.clamp(dt * 0.15, 0, 0.05));
+      this.quat.slerp(target, U.clamp(attDt * 0.15, 0, 0.05));
       // שמירת הרול המקורי - slerp קטן, השפעה מזערית
+    }
+
+    // יישור כנפיים עדין בהאצת זמן: כשלא לוחצים על ההגה, נטייה שנשארה
+    // פתוחה מתוקנת בהדרגה. החוזק גדל עם קצב ההאצה — כי אחרת נטייה
+    // שנשכחה "עולה" להרבה יותר איבוד גובה כשמרחק/גובה מתקדמים מואץ.
+    if (timeScale > 1 && Math.abs(ctl.roll) < 0.05) {
+      var rollErrDeg = this.getRollDeg();
+      if (Math.abs(rollErrDeg) > 0.3) {
+        var lvlRate = U.clamp((timeScale - 1) * 0.06, 0, 3.2); // רד/ש
+        var lvlStep = Math.min(Math.abs(rollErrDeg) * U.DEG, lvlRate * attDt);
+        var lvlQ = new THREE.Quaternion().setFromAxisAngle(fwd, -Math.sign(rollErrDeg) * lvlStep);
+        this.quat.premultiply(lvlQ);
+      }
     }
   }
   this.quat.normalize();

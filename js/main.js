@@ -244,7 +244,7 @@ APP.loop = function (now) {
     var sub = dt / steps;
     var ev = {};
     for (var s = 0; s < steps; s++) {
-      var e = ac.update(sub, ctl, ge);
+      var e = ac.update(sub, ctl, ge, timeScale);
       if (e.crash) ev.crash = true;
       if (e.touchdown) ev.touchdown = e.touchdown;
     }
