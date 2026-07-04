@@ -409,8 +409,8 @@ Aircraft.prototype.update = function (dt, ctl, groundElev, timeScale) {
   this.groundElev = groundElev;
   var attDt = (timeScale && timeScale > 1) ? dt / timeScale : dt;
 
-  // מצערת
-  this.throttle = U.clamp(this.throttle + ctl.throttleDelta * dt * 0.5, 0, 1);
+  // מצערת (בקצב זמן-אמת, שלא תקפוץ בהאצת זמן)
+  this.throttle = U.clamp(this.throttle + ctl.throttleDelta * attDt * 0.8, 0, 1);
 
   // וקטורי גוף
   var fwd = this._fwd.set(0, 0, -1).applyQuaternion(this.quat);
@@ -518,20 +518,19 @@ Aircraft.prototype.update = function (dt, ctl, groundElev, timeScale) {
     dq.setFromAxisAngle(fwd, -rollRate * attDt); this.quat.premultiply(dq);
     dq.setFromAxisAngle(up, -yawRate * attDt); this.quat.premultiply(dq);
 
-    // יציבות טבעית קלה — האף נוטה לכיוון וקטור המהירות
+    // יציבות אווירודינמית — האף עוקב אחרי וקטור המהירות (פנייה מתואמת:
+    // מטים כנף, העילוי מסובב את המסלול, והאף מתיישר איתו במקום "להחליק")
     if (v > 30 && !this.stalled) {
       var vdir2 = this._tmp.copy(this.vel).normalize();
-      var cur = new THREE.Quaternion().copy(this.quat);
-      var look = new THREE.Matrix4().lookAt(new THREE.Vector3(0,0,0), vdir2, up);
+      var look = new THREE.Matrix4().lookAt(new THREE.Vector3(0, 0, 0), vdir2, up);
       var target = new THREE.Quaternion().setFromRotationMatrix(look);
-      this.quat.slerp(target, U.clamp(attDt * 0.15, 0, 0.05));
-      // שמירת הרול המקורי - slerp קטן, השפעה מזערית
+      this.quat.slerp(target, U.clamp(attDt * 0.6, 0, 0.15));
     }
 
     // יישור כנפיים עדין בהאצת זמן: כשלא לוחצים על ההגה, נטייה שנשארה
     // פתוחה מתוקנת בהדרגה. החוזק גדל עם קצב ההאצה — כי אחרת נטייה
     // שנשכחה "עולה" להרבה יותר איבוד גובה כשמרחק/גובה מתקדמים מואץ.
-    if (timeScale > 1 && Math.abs(ctl.roll) < 0.05) {
+    if (timeScale > 4 && Math.abs(ctl.roll) < 0.05) {
       var rollErrDeg = this.getRollDeg();
       if (Math.abs(rollErrDeg) > 0.3) {
         var lvlRate = U.clamp((timeScale - 1) * 0.06, 0, 3.2); // רד/ש

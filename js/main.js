@@ -183,14 +183,22 @@ APP.updateCamera = function (ac, dt) {
   var cam = APP.camera;
   var planeY = ac.alt;
 
+  // FOV דינמי — נפתח עם המהירות ונותן תחושת טיסה אמיתית
+  var spdFrac = U.clamp(ac.speed() / CFG.PLANE.MAX_SPEED, 0, 1);
+  var targetFov = 60 + 17 * spdFrac + (ac.afterburner ? 4 : 0);
+  cam.fov += (targetFov - cam.fov) * U.clamp(dt * 2.5, 0, 1);
+  cam.updateProjectionMatrix();
+
   if (APP.camMode === 1) {
     // תא הטייס
+    cam.up.set(0, 1, 0);
     var off = new THREE.Vector3(0, 1.05, -4.4).applyQuaternion(ac.quat);
     cam.position.set(off.x, planeY + off.y, off.z);
     cam.quaternion.copy(ac.quat);
     ac.group.visible = false;
   } else if (APP.camMode === 2) {
     // מבט ממגדל שדה התעופה הקרוב
+    cam.up.set(0, 1, 0);
     ac.group.visible = true;
     var best = null, bestD = 1e18;
     for (var i = 0; i < WORLD.airports.length; i++) {
@@ -205,18 +213,21 @@ APP.updateCamera = function (ac, dt) {
     }
     cam.lookAt(0, planeY, 0);
   } else {
-    // עוקבת — מאחורי המטוס עם החלקה
+    // עוקבת — מאחורי המטוס, אופק מיוצב (רק חלק קטן מהרול עובר למצלמה)
     ac.group.visible = true;
-    var back = new THREE.Vector3(0, 5, 26).applyQuaternion(ac.quat);
-    var target = new THREE.Vector3(back.x, planeY + back.y, back.z);
-    var k = 1 - Math.pow(0.001, dt);
+    var fwdW = new THREE.Vector3(0, 0, -1).applyQuaternion(ac.quat);
+    var target = new THREE.Vector3(
+      -fwdW.x * 24, planeY - fwdW.y * 24 + 5.5, -fwdW.z * 24);
+    var k = 1 - Math.pow(0.0004, dt);
     APP._camPos.lerp(target, k);
     // לא לרדת מתחת לקרקע
     var camGround = ac.groundElev + 2.5;
     if (APP._camPos.y < camGround) APP._camPos.y = camGround;
     cam.position.copy(APP._camPos);
-    var lookAhead = new THREE.Vector3(0, 0, -20).applyQuaternion(ac.quat);
-    cam.lookAt(lookAhead.x, planeY + lookAhead.y, lookAhead.z);
+    // ערבוב עדין של הרול לתוך "למעלה" של המצלמה — נותן תחושת הטיה בלי לאבד אופק
+    var planeUp = new THREE.Vector3(0, 1, 0).applyQuaternion(ac.quat);
+    cam.up.set(0, 1, 0).lerp(planeUp, 0.3).normalize();
+    cam.lookAt(fwdW.x * 32, planeY + fwdW.y * 32 + 1.5, fwdW.z * 32);
   }
 };
 

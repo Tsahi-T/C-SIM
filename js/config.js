@@ -20,8 +20,8 @@ var CFG = {
   // --- מטוס הקרב ---
   PLANE: {
     MASS: 22000,                // ק"ג (משקל המראה טיפוסי)
-    THRUST_MIL: 125000,         // ניוטון — עוצמה צבאית מלאה
-    THRUST_AB: 191000,          // ניוטון — עם מבער אחורי
+    THRUST_MIL: 135000,         // ניוטון — עוצמה צבאית מלאה (מכוונן לתחושה)
+    THRUST_AB: 200000,          // ניוטון — עם מבער אחורי
     WING_AREA: 42.7,            // מ"ר
     MAX_SPEED: 550,             // מ/ש (~מאך 1.6)
     STALL_SPEED_CLEAN: 80,      // מ/ש הזדקרות ללא מדפים
@@ -42,10 +42,10 @@ var CFG = {
   },
 
   // --- זמן ---
-  // הראשונה היא ברירת המחדל (בלי לגעת ב-T) — קצת מהר מזמן-אמת כדי שתהיה
-  // תחושת טיסה. ההיגוי תמיד מגיב בקצב זמן-אמת (ר' aircraft.js/attDt),
-  // כך שגם ברמות הגבוהות המטוס נשאר נשלט.
-  TIME_SCALES: [2, 8, 25, 70],
+  // ברירת המחדל היא זמן-אמת (×1) — כך הפיזיקה והבקרה עקביות ותחושת
+  // הטיסה מגיעה מהמצלמה (FOV דינמי, אופק מיוצב) ומפרטי הקרקע.
+  // הרמות הגבוהות הן להפלגות ארוכות; ההיגוי נשאר בקצב זמן-אמת (attDt).
+  TIME_SCALES: [1, 10, 40, 100],
 
   // --- גרפיקה ---
   FOG_NEAR_FACTOR: 0.45,
@@ -159,6 +159,13 @@ var U = {
     var dLat = (lat2 - lat1) * CFG.M_PER_DEG_LAT / 1000;
     var dLng = U.dLon(lon1, lon2) * U.mPerDegLon((lat1 + lat2) / 2) / 1000;
     return Math.sqrt(dLat * dLat + dLng * dLng);
+  },
+
+  // אזימוט (מעלות, 0=צפון) מנקודה 1 לנקודה 2
+  bearing: function (lat1, lon1, lat2, lon2) {
+    var dN = (lat2 - lat1) * CFG.M_PER_DEG_LAT;
+    var dE = U.dLon(lon1, lon2) * U.mPerDegLon((lat1 + lat2) / 2);
+    return (Math.atan2(dE, dN) * U.RAD + 360) % 360;
   },
 
   fmtCoord: function (lat, lon) {
