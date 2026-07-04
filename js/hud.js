@@ -67,9 +67,6 @@ HUD.draw = function (ac, timeScale, camMode) {
       c.moveTo(30 * f, y); c.lineTo(wLine, y);
     } else {
       // קווים מקווקווים מתחת לאופק
-      for (var seg = 0; seg < 4; seg++) {
-        var x0 = -wLine + seg * (wLine - 30 * f) / 2;
-      }
       c.setLineDash([12, 8]);
       c.moveTo(-wLine, y); c.lineTo(-30 * f, y);
       c.moveTo(30 * f, y); c.lineTo(wLine, y);
@@ -212,10 +209,13 @@ HUD.tape = function (c, x, cy, value, step, pxPerUnit, rightSide, f) {
     c.globalAlpha = 1;
   }
   c.restore();
-  // תיבת ערך נוכחי
+  // תיבת ערך נוכחי — עם רקע אטום כדי שלא תתערבב עם הסרגל
   c.textAlign = "center";
   var bw = 62 * f;
-  var bx = x + (rightSide ? 10 : -10 - 0);
+  var prevFill = c.fillStyle;
+  c.fillStyle = "rgba(0, 12, 4, 0.85)";
+  c.fillRect(x - bw / 2, cy - 11, bw, 22);
+  c.fillStyle = prevFill;
   c.strokeRect(x - bw / 2, cy - 11, bw, 22);
   c.fillText(Math.round(value), x, cy + 5);
 };

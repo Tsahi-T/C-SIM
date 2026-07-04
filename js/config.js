@@ -26,8 +26,8 @@ var CFG = {
     MAX_SPEED: 550,             // מ/ש (~מאך 1.6)
     STALL_SPEED_CLEAN: 80,      // מ/ש הזדקרות ללא מדפים
     STALL_SPEED_FLAPS: 62,      // מ/ש עם מדפים
-    PITCH_RATE: 1.5,            // רד/ש מקסימום
-    ROLL_RATE: 3.4,             // רד/ש
+    PITCH_RATE: 0.95,           // רד/ש מקסימום
+    ROLL_RATE: 2.6,             // רד/ש
     YAW_RATE: 0.5,              // רד/ש
     GEAR_MAX_SPEED: 130,        // מ/ש — מעל זה נזק לגלגלים (התראה)
     SERVICE_CEILING: 15000      // מ' — תקרת שירות

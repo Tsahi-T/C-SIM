@@ -33,6 +33,7 @@ CTL.init = function (onToggle) {
   window.addEventListener("blur", function () { CTL.keys = {}; });
 
   if (CTL.isMobile) {
+    document.body.classList.add("mobile");
     document.getElementById("mobileUI").classList.remove("hidden");
     CTL.initTouch();
   }

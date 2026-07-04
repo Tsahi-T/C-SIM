@@ -101,7 +101,7 @@ function buildF35() {
   // להבת מבער אחורי
   var flameMat = new THREE.MeshBasicMaterial({ color: 0xff7722, transparent: true, opacity: 0.85 });
   var flame = new THREE.Mesh(new THREE.ConeGeometry(0.45, 3.2, 10), flameMat);
-  flame.rotation.x = -Math.PI / 2;
+  flame.rotation.x = Math.PI / 2;   // חוד הלהבה אחורה
   flame.position.set(0, 0, 10.4);
   flame.visible = false;
   g.add(flame);

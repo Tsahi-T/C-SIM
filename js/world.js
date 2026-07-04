@@ -52,11 +52,8 @@ WORLD.isLandC = function (lat, lon) {
   return v;
 };
 
-// גובה קרקע גולמי (ללא שיטוח שדות תעופה)
-WORLD.rawElev = function (lat, lon) {
-  if (!WORLD.isLandC(lat, lon)) return 0;
-  var lake = GEO.inLake(lat, lon);
-  if (lake) return lake.waterLevel;
+// גובה בסיס — תבליט בלבד, ללא שיטוח עירוני
+WORLD.baseElev = function (lat, lon) {
 
   var e;
   if (GEO.inIsrael(lat, lon)) {
@@ -78,10 +75,27 @@ WORLD.rawElev = function (lat, lon) {
     e = 30 + 240 * U.fbm(lat * 12, lon * 12, 4) + mount * 2400 * U.fbm(lat * 25, lon * 25, 4);
   }
 
-  // שיטוח באזורים עירוניים
-  var cf = WORLD.cityFactor(lat, lon).f;
-  if (cf > 0) e = U.lerp(e, Math.min(e, 60), cf * 0.85);
-  return Math.max(e, GEO.inLake(lat, lon) ? e : -428);
+  return Math.max(e, -428);
+};
+
+WORLD._cityElevCache = {};
+
+// גובה קרקע גולמי: תבליט + שיטוח עירוני יחסי לגובה מרכז העיר
+WORLD.rawElev = function (lat, lon) {
+  if (!WORLD.isLandC(lat, lon)) return 0;
+  var lake = GEO.inLake(lat, lon);
+  if (lake) return lake.waterLevel;
+  var e = WORLD.baseElev(lat, lon);
+  var cf = WORLD.cityFactor(lat, lon);
+  if (cf.f > 0 && cf.city) {
+    var ce = WORLD._cityElevCache[cf.city.name];
+    if (ce === undefined) {
+      ce = WORLD.baseElev(cf.city.lat, cf.city.lon);
+      WORLD._cityElevCache[cf.city.name] = ce;
+    }
+    e = U.lerp(e, ce, cf.f * 0.8);   // העיר יושבת על רמה בגובה המקומי
+  }
+  return e;
 };
 
 // גובה קרקע סופי — כולל שיטוח ליד שדות תעופה
@@ -763,7 +777,7 @@ WORLD.updateLabels = function (lat, lon, alt) {
       var z = -(c.lat - lat) * GAME_M_DEG;
       var ey = isCountry ? alt * 0.35 + 500 : WORLD.groundElevAt(c.lat, c.lon) + 250 + (c.size || 1) * 60;
       rec.sprite.position.set(x, ey, z);
-      var scl = U.clamp(d * 1000 * 0.055, 220, 26000) * (isCountry ? 2.2 : 1);
+      var scl = U.clamp(d * 1000 * 0.08, 350, 34000) * (isCountry ? 2.2 : 1);
       rec.sprite.scale.set(scl, scl * 0.19, 1);
     }
   }

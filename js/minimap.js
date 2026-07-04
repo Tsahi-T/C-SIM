@@ -168,20 +168,21 @@ MAP.drawWorld = function (ac) {
     return [(lon + 180) / 360 * W, (90 - lat) / 180 * H];
   }
 
-  // ערפל גילוי — כיסוי כהה על תאים שלא נחקרו
-  var cw = W / 360, ch = H / 180;
-  c.fillStyle = "rgba(2, 8, 16, 0.78)";
+  // ערפל גילוי — מסכה במשבצות 1°x1°, מצוירת חלק בהגדלה
+  if (!MAP._fogCv) {
+    MAP._fogCv = document.createElement("canvas");
+    MAP._fogCv.width = 360; MAP._fogCv.height = 180;
+  }
+  var fc = MAP._fogCv.getContext("2d");
+  fc.clearRect(0, 0, 360, 180);
+  fc.fillStyle = "rgba(2, 8, 16, 0.8)";
   for (var y = 0; y < 180; y++) {
-    var runStart = -1;
-    for (var x = 0; x <= 360; x++) {
-      var unexplored = x < 360 && !MAP.explored[y * 360 + x];
-      if (unexplored && runStart < 0) runStart = x;
-      if (!unexplored && runStart >= 0) {
-        c.fillRect(runStart * cw, y * ch, (x - runStart) * cw, ch + 0.5);
-        runStart = -1;
-      }
+    for (var x = 0; x < 360; x++) {
+      if (!MAP.explored[y * 360 + x]) fc.fillRect(x, y, 1, 1);
     }
   }
+  c.imageSmoothingEnabled = true;
+  c.drawImage(MAP._fogCv, 0, 0, W, H);
 
   // נתיב מלא
   c.strokeStyle = "rgba(120,220,255,0.8)";
