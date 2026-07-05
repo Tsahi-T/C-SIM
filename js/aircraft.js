@@ -527,16 +527,27 @@ Aircraft.prototype.update = function (dt, ctl, groundElev, timeScale) {
       this.quat.slerp(target, U.clamp(attDt * 0.6, 0, 0.15));
     }
 
-    // יישור כנפיים עדין בהאצת זמן: כשלא לוחצים על ההגה, נטייה שנשארה
-    // פתוחה מתוקנת בהדרגה. החוזק גדל עם קצב ההאצה — כי אחרת נטייה
-    // שנשכחה "עולה" להרבה יותר איבוד גובה כשמרחק/גובה מתקדמים מואץ.
-    if (timeScale > 4 && Math.abs(ctl.roll) < 0.05) {
-      var rollErrDeg = this.getRollDeg();
-      if (Math.abs(rollErrDeg) > 0.3) {
-        var lvlRate = U.clamp((timeScale - 1) * 0.06, 0, 3.2); // רד/ש
-        var lvlStep = Math.min(Math.abs(rollErrDeg) * U.DEG, lvlRate * attDt);
-        var lvlQ = new THREE.Quaternion().setFromAxisAngle(fwd, -Math.sign(rollErrDeg) * lvlStep);
-        this.quat.premultiply(lvlQ);
+    // טייס-אוטומטי עדין בהאצת זמן: כשמרפים מההגה, המטוס מתייצב לטיסה
+    // ישרה ואופקית (רול ופיץ' חוזרים לאפס). בלי זה, בהאצה גם נטייה זעירה
+    // "מתפוצצת" לאיבוד גובה כי המרחק/גובה מתקדמים מואץ — וזו הייתה סיבת
+    // ההתרסקות המיידית. פעיל רק כשלא נוגעים בהגה, כך שאינו מפריע לתמרון.
+    if (timeScale > 1) {
+      var lvlRate = U.clamp(0.35 + (timeScale - 1) * 0.12, 0, 4); // רד/ש
+      if (Math.abs(ctl.roll) < 0.05) {
+        var rollErrDeg = this.getRollDeg();
+        if (Math.abs(rollErrDeg) > 0.3) {
+          var lvlStep = Math.min(Math.abs(rollErrDeg) * U.DEG, lvlRate * attDt);
+          var lvlQ = new THREE.Quaternion().setFromAxisAngle(fwd, -Math.sign(rollErrDeg) * lvlStep);
+          this.quat.premultiply(lvlQ);
+        }
+      }
+      if (Math.abs(ctl.pitch) < 0.05) {
+        var pitchErrDeg = this.getPitchDeg();
+        if (Math.abs(pitchErrDeg) > 0.5) {
+          var pStep = Math.min(Math.abs(pitchErrDeg) * U.DEG, lvlRate * 0.6 * attDt);
+          var pQ = new THREE.Quaternion().setFromAxisAngle(right, -Math.sign(pitchErrDeg) * pStep);
+          this.quat.premultiply(pQ);
+        }
       }
     }
   }
